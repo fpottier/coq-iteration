@@ -1,0 +1,8 @@
+(include_subdirs qualified)
+(coq.theory
+  (package coq-iteration)
+  (name iteration)
+  (theories
+    stdpp
+  )
+)

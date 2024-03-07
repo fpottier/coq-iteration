@@ -1,0 +1,2 @@
+-arg -set -arg Debug=-backtrace
+-Q _build/default/theories iteration
