@@ -245,6 +245,11 @@ Definition steps {A} (α : automaton A) : state α → list A → state α → P
 
 (* [s2a] converts an iteration space to an automaton. *)
 
+(* This automaton is constructed in the simplest possible way. Its reachable
+   states are the permitted lists of elements. Its edges form a tree, whose
+   root (the automaton's initial state) is the empty list, and where every
+   state other than the root has exactly one parent. *)
+
 Definition s2a {A} (σ : space A) : automaton A :=
   {|
     state   := list A;
