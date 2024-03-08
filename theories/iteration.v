@@ -243,6 +243,97 @@ Definition steps {A} (α : automaton A) : state α → list A → state α → P
 
 (* -------------------------------------------------------------------------- *)
 
+(* Similarity of automata. *)
+
+(* [simulation α1 α2 R] means that the relation [R] is a simulation
+   between the automata [α1] and [α2]. This implies that every sequence
+   that is accepted by [α1] is also accepted by [α2]. *)
+
+Inductive simulation {A}
+  (α1 α2 : automaton A)
+  (R : state α1 → state α2 → Prop)
+: Prop :=
+| Sim :
+    R (initial α1) (initial α2) →
+    (∀ s1 s2, final α1 s1 → R s1 s2 → final α2 s2) →
+    (∀ s1 s2 a s'1,
+      step α1 s1 a s'1 →
+      R s1 s2 →
+      ∃ s'2,
+      step α2 s2 a s'2 ∧
+      R s'1 s'2
+    ) →
+    simulation α1 α2 R.
+
+Lemma use_simulation_diagram {A} {α1 α2 : automaton A} {R s1 s'1 s2 a} :
+  simulation α1 α2 R →
+  step α1 s1 a s'1 →
+  R s1 s2 →
+  ∃ s'2,
+  step α2 s2 a s'2 ∧
+  R s'1 s'2.
+Proof.
+  inversion 1; eauto.
+Qed.
+
+(* TODO unused? *)
+Local Ltac use_simulation_diagram s :=
+  match goal with
+  Hsim: simulation ?α1 ?α2 ?R,
+  Hstep: step ?α1 ?s1 ?a ?s'1,
+  HR : ?R ?s1 ?s2 |- _ =>
+    let Hstep' := fresh Hstep in
+    let HR' := fresh HR in
+    pose proof (use_simulation_diagram Hsim Hstep HR) as (s & Hstep' & HR')
+  end.
+
+Local Ltac consume_simulation_diagram s :=
+  match goal with
+  Hsim: simulation ?α1 ?α2 ?R,
+  Hstep: step ?α1 ?s1 ?a ?s'1,
+  HR : ?R ?s1 ?s2 |- _ =>
+    let Hstep' := fresh Hstep in
+    let HR' := fresh HR in
+    pose proof (use_simulation_diagram Hsim Hstep HR) as (s & Hstep' & HR');
+    clear Hstep HR;
+    rename Hstep' into Hstep; rename HR' into HR
+  end.
+
+(* [similar α1 α2] holds if there exists a simulation [R]
+   between [α1] and [α2]. *)
+
+Definition similar {A} (α1 α2 : automaton A) :=
+  exists R, simulation α1 α2 R.
+
+Local Infix "≼" := similar (at level 70, no associativity).
+
+Lemma simulation_reflexive {A} (α : automaton A) :
+  simulation α α eq.
+Proof.
+  econstructor; intros; subst; eauto.
+Qed.
+
+(* Composition of relations. *)
+(* TODO is this already defined somewhere in stdlib or stdpp? *)
+Definition compose {A B C} (R : A → B → Prop) (S : B → C → Prop) :=
+  λ a c, ∃ b, R a b ∧ S b c.
+
+Lemma simulation_transitive {A} (α β γ : automaton A) R S :
+  simulation α β R →
+  simulation β γ S →
+  simulation α γ (compose R S).
+Proof.
+  inversion 1; inversion 1. unfold compose. econstructor.
+  { eauto. }
+  { firstorder. }
+  { intros s1 s3 a s'1 Hstep (s2 & HR & HS).
+    consume_simulation_diagram s'2.
+    consume_simulation_diagram s'3.
+    eauto. }
+Qed.
+
+(* -------------------------------------------------------------------------- *)
+
 (* [s2a] converts an iteration space to an automaton. *)
 
 (* This automaton is constructed in the simplest possible way. Its reachable
@@ -380,7 +471,12 @@ Qed.
 
 (* -------------------------------------------------------------------------- *)
 
+
+
+(* -------------------------------------------------------------------------- *)
+
 Module SpaceNotations.
   Infix "⊑" := subspace (at level 70, no associativity).
   Infix "≡" := eqspace (at level 70, no associativity).
+  Infix "≼" := similar (at level 70, no associativity).
 End SpaceNotations.
