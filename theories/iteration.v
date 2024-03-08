@@ -265,7 +265,29 @@ Inductive simulation {A}
     ) →
     simulation α1 α2 R.
 
-Lemma use_simulation_diagram {A} {α1 α2 : automaton A} {R s1 s'1 s2 a} :
+(* TODO [simulation] could be a record?
+   then the following lemmas would be the projections *)
+Lemma init_simulation  {A} {α1 α2 : automaton A} {R} :
+  simulation α1 α2 R →
+  R (initial α1) (initial α2).
+Proof.
+  inversion 1; eauto.
+Qed.
+
+Local Ltac init_simulation :=
+  match goal with
+  Hsim: simulation ?α1 ?α2 ?R |- _ =>
+    pose proof (init_simulation Hsim)
+  end.
+
+Lemma simulation_final  {A} {α1 α2 : automaton A} {R} :
+  simulation α1 α2 R →
+  ∀ s1 s2, final α1 s1 → R s1 s2 → final α2 s2.
+Proof.
+  inversion 1; eauto.
+Qed.
+
+Lemma step_simulation_diagram {A} {α1 α2 : automaton A} {R s1 s'1 s2 a} :
   simulation α1 α2 R →
   step α1 s1 a s'1 →
   R s1 s2 →
@@ -276,27 +298,46 @@ Proof.
   inversion 1; eauto.
 Qed.
 
-(* TODO unused? *)
-Local Ltac use_simulation_diagram s :=
+Local Ltac step_simulation_diagram s :=
   match goal with
   Hsim: simulation ?α1 ?α2 ?R,
   Hstep: step ?α1 ?s1 ?a ?s'1,
   HR : ?R ?s1 ?s2 |- _ =>
     let Hstep' := fresh Hstep in
     let HR' := fresh HR in
-    pose proof (use_simulation_diagram Hsim Hstep HR) as (s & Hstep' & HR')
-  end.
-
-Local Ltac consume_simulation_diagram s :=
-  match goal with
-  Hsim: simulation ?α1 ?α2 ?R,
-  Hstep: step ?α1 ?s1 ?a ?s'1,
-  HR : ?R ?s1 ?s2 |- _ =>
-    let Hstep' := fresh Hstep in
-    let HR' := fresh HR in
-    pose proof (use_simulation_diagram Hsim Hstep HR) as (s & Hstep' & HR');
+    pose proof (step_simulation_diagram Hsim Hstep HR)
+      as (s & Hstep' & HR');
     clear Hstep HR;
     rename Hstep' into Hstep; rename HR' into HR
+  end.
+
+Lemma steps_simulation_diagram {A} {α1 α2 : automaton A} {R s1 s'1 xs} :
+  simulation α1 α2 R →
+  steps α1 s1 xs s'1 →
+  ∀ {s2},
+  R s1 s2 →
+  ∃ s'2,
+  steps α2 s2 xs s'2 ∧
+  R s'1 s'2.
+Proof.
+  unfold steps. induction 2; intros.
+  { eauto with rtcl. }
+  { step_simulation_diagram s'2.
+    edestruct IHrtcl as (s''2 & ? & ?); [ eauto |].
+    eauto with rtcl. }
+Qed.
+
+Local Ltac steps_simulation_diagram s :=
+  match goal with
+  Hsim: simulation ?α1 ?α2 ?R,
+  Hsteps: steps ?α1 ?s1 ?xs ?s'1,
+  HR : ?R ?s1 ?s2 |- _ =>
+    let Hsteps' := fresh Hsteps in
+    let HR' := fresh HR in
+    pose proof (steps_simulation_diagram Hsim Hsteps HR)
+      as (s & Hsteps' & HR');
+    clear Hsteps HR;
+    rename Hsteps' into Hsteps; rename HR' into HR
   end.
 
 (* [similar α1 α2] holds if there exists a simulation [R]
@@ -327,8 +368,8 @@ Proof.
   { eauto. }
   { firstorder. }
   { intros s1 s3 a s'1 Hstep (s2 & HR & HS).
-    consume_simulation_diagram s'2.
-    consume_simulation_diagram s'3.
+    step_simulation_diagram s'2.
+    step_simulation_diagram s'3.
     eauto. }
 Qed.
 
@@ -471,7 +512,23 @@ Qed.
 
 (* -------------------------------------------------------------------------- *)
 
+(* Similarity is sound: [α1 ≼ α2] implies [a2s α1 ⊑ a2s α2]. That is, if
+   [α1] is simulated by [α2] then the sequences accepted by [α1] form a
+   subset of the sequences accepted by [α2]. *)
 
+Lemma similar_subspace {A} (α1 α2 : automaton A) :
+  α1 ≼ α2 →
+  a2s α1 ⊑ a2s α2.
+Proof.
+  unfold similar. intros (R & Hsim).
+  unfold subspace. split.
+  { unfold permitted, a2s. intros xs (s1 & ?).
+    init_simulation. steps_simulation_diagram s2.
+    eauto. }
+  { unfold complete, a2s.  intros xs (s1 & ? & ?).
+    init_simulation. steps_simulation_diagram s2.
+    eauto using simulation_final. }
+Qed.
 
 (* -------------------------------------------------------------------------- *)
 
