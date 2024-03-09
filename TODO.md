@@ -1,9 +1,37 @@
 # To Do
 
-## Definitely
+## Definitions
 
 * Characterize what it means for an iteration space to be
-  deterministic.
+  deterministic. Note that a deterministic iteration space
+  is isomorphic to a finite or infinite stream.
+
+* Characterize what it means for an iteration space to be
+  finite. Note that a finite iteration space is isomorphic
+  to a set of lists (which represent the complete sequences).
+
+* Note that a deterministic and finite iteration space is
+  isomorphic to a single list.
+
+* Define derivatives, both on iteration spaces and on automata,
+  and prove a correspondence.
+
+* An alternative way of converting an iteration space to an automaton is to
+  use `derivative`. The states of the automaton are iteration spaces, and the
+  transitions are given by `derivative`. A state is final if `complete []`
+  holds.
+
+* Define deterministic automata, with a single initial state, with a
+  transition function of type `state → option (A * state)`.
+  Define a conversion of a deterministic automaton into
+  a non-deterministic one.
+  Note that a deterministic automaton is isomorphic
+  to a finite or infinite stream.
+
+* Define non-deterministic automata with ε transitions. Define conversions
+  (both ways) between them and ordinary non-deterministic automata.
+
+## Combinators
 
 * Offer all of the combinators of regular expressions (empty,
   singleton, union, sequence, star) both on iteration spaces
@@ -13,25 +41,9 @@
   On the automaton side, some combinators are easier to express
   if ε transitions are allowed (Thompson's construction).
 
-* Define derivatives, both on iteration spaces and on automata,
-  and prove a correspondence.
-
-* An alternative way of converting an iteration space to a (deterministic)
-  automaton is to use `derivative`. The states of the automaton are iteration
-  spaces, and the transitions are given by `derivative`. A state is final if
-  `complete []` holds.
+## Technicalities
 
 * Set up rewriting modulo the preorders on spaces / automata.
-
-## Maybe
-
-* Define deterministic automata, with a single initial state, with a
-  transition function instead of a transition relation, and where
-  a final state does not have successors. Define conversions (both
-  ways) between deterministic and non-deterministic automata.
-
-* Define non-deterministic with ε transitions. Define conversions
-  (both ways) between them and ordinary non-deterministic automata.
 
 ## Maybe Not
 
