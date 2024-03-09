@@ -245,11 +245,11 @@ Program Definition top {A} : space A :=
 
 (* -------------------------------------------------------------------------- *)
 
-(* A definition of iteration spaces in terms of automata. *)
+(* A definition of iteration spaces in terms of non-deterministic automata. *)
 
 (* These are not necessarily finite-state automata. *)
 
-Record automaton A := {
+Record nauto A := {
   state     : Type;
   initial   : state;
   step      : state → A → state → Prop;
@@ -261,7 +261,7 @@ Arguments initial {A} _.
 Arguments step    {A} _.
 Arguments final   {A} _.
 
-Definition steps {A} (α : automaton A) : state α → list A → state α → Prop :=
+Definition steps {A} (α : nauto A) : state α → list A → state α → Prop :=
   rtcl (step α).
 
 (* -------------------------------------------------------------------------- *)
@@ -273,7 +273,7 @@ Definition steps {A} (α : automaton A) : state α → list A → state α → P
    that is accepted by [α1] is also accepted by [α2]. *)
 
 Inductive simulation {A}
-  (α1 α2 : automaton A)
+  (α1 α2 : nauto A)
   (R : state α1 → state α2 → Prop)
 : Prop :=
 | Sim :
@@ -290,7 +290,7 @@ Inductive simulation {A}
 
 (* TODO [simulation] could be a record?
    then the following lemmas would be the projections *)
-Lemma init_simulation  {A} {α1 α2 : automaton A} {R} :
+Lemma init_simulation  {A} {α1 α2 : nauto A} {R} :
   simulation α1 α2 R →
   R (initial α1) (initial α2).
 Proof.
@@ -303,14 +303,14 @@ Local Ltac init_simulation :=
     pose proof (init_simulation Hsim)
   end.
 
-Lemma simulation_final  {A} {α1 α2 : automaton A} {R} :
+Lemma simulation_final  {A} {α1 α2 : nauto A} {R} :
   simulation α1 α2 R →
   ∀ s1 s2, final α1 s1 → R s1 s2 → final α2 s2.
 Proof.
   inversion 1; eauto.
 Qed.
 
-Lemma step_simulation_diagram {A} {α1 α2 : automaton A} {R s1 s'1 s2 a} :
+Lemma step_simulation_diagram {A} {α1 α2 : nauto A} {R s1 s'1 s2 a} :
   simulation α1 α2 R →
   step α1 s1 a s'1 →
   R s1 s2 →
@@ -334,7 +334,7 @@ Local Ltac step_simulation_diagram s :=
     rename Hstep' into Hstep; rename HR' into HR
   end.
 
-Lemma steps_simulation_diagram {A} {α1 α2 : automaton A} {R s1 s'1 xs} :
+Lemma steps_simulation_diagram {A} {α1 α2 : nauto A} {R s1 s'1 xs} :
   simulation α1 α2 R →
   steps α1 s1 xs s'1 →
   ∀ {s2},
@@ -366,12 +366,12 @@ Local Ltac steps_simulation_diagram s :=
 (* [similar α1 α2] holds if there exists a simulation [R]
    between [α1] and [α2]. *)
 
-Definition similar {A} (α1 α2 : automaton A) :=
+Definition similar {A} (α1 α2 : nauto A) :=
   exists R, simulation α1 α2 R.
 
 Local Infix "≼" := similar (at level 70, no associativity).
 
-Lemma simulation_reflexive {A} (α : automaton A) :
+Lemma simulation_reflexive {A} (α : nauto A) :
   simulation α α eq.
 Proof.
   econstructor; intros; subst; eauto.
@@ -382,7 +382,7 @@ Qed.
 Definition compose {A B C} (R : A → B → Prop) (S : B → C → Prop) :=
   λ a c, ∃ b, R a b ∧ S b c.
 
-Lemma simulation_transitive {A} (α β γ : automaton A) R S :
+Lemma simulation_transitive {A} (α β γ : nauto A) R S :
   simulation α β R →
   simulation β γ S →
   simulation α γ (compose R S).
@@ -405,7 +405,7 @@ Qed.
    root (the automaton's initial state) is the empty list, and where every
    state other than the root has exactly one parent. *)
 
-Definition s2a {A} (σ : space A) : automaton A :=
+Definition s2a {A} (σ : space A) : nauto A :=
   {|
     state   := list A;
     initial := [];
@@ -417,7 +417,7 @@ Definition s2a {A} (σ : space A) : automaton A :=
 
 (* [a2s] converts an automaton to an iteration space. *)
 
-Program Definition a2s {A} (α : automaton A) : space A :=
+Program Definition a2s {A} (α : nauto A) : space A :=
   {|
     permitted xs := ∃ s, steps α (initial α) xs s;
     complete  xs := ∃ s, steps α (initial α) xs s ∧ final α s;
@@ -547,7 +547,7 @@ Qed.
    [α1] is simulated by [α2] then the sequences accepted by [α1] form a
    subset of the sequences accepted by [α2]. *)
 
-Lemma similar_subspace {A} (α1 α2 : automaton A) :
+Lemma similar_subspace {A} (α1 α2 : nauto A) :
   α1 ≼ α2 →
   a2s α1 ⊑ a2s α2.
 Proof.
