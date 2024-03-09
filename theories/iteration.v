@@ -2,7 +2,6 @@ Require Import Utf8.
 Require Import Coq.Program.Equality.
 Require Import List. Import ListNotations.
 Require Import stdpp.orders.
-Set Primitive Projections.
 
 (* -------------------------------------------------------------------------- *)
 
@@ -274,32 +273,40 @@ Definition steps {A} (α : nauto A) : state α → list A → state α → Prop 
    between the automata [α1] and [α2]. This implies that every sequence
    that can be produced by [α1] can also be produced by [α2]. *)
 
-Inductive simulation {A}
+Record simulation {A}
   (α1 α2 : nauto A)
   (R : state α1 → state α2 → Prop)
 : Prop :=
-| Sim :
-    (∀ s1, initial α1 s1 → ∃ s2, R s1 s2 ∧ initial α2 s2) →
-    (∀ s1 s2, final α1 s1 → R s1 s2 → final α2 s2) →
-    (∀ s1 s2 a s'1,
-      step α1 s1 a s'1 →
-      R s1 s2 →
-      ∃ s'2,
-      step α2 s2 a s'2 ∧
-      R s'1 s'2
-    ) →
-    simulation α1 α2 R.
+{
+  init_simulation :
+    ∀ s1,
+    initial α1 s1 →
+    ∃ s2,
+    R s1 s2 ∧
+    initial α2 s2
+  ;
 
-(* TODO [simulation] could be a record?
-   then the following lemmas would be the projections *)
+  step_simulation :
+    ∀ s1 s2 x s'1,
+    step α1 s1 x s'1 →
+    R s1 s2 →
+    ∃ s'2,
+    step α2 s2 x s'2 ∧
+    R s'1 s'2
+  ;
 
-Lemma init_simulation {A} {α1 α2 : nauto A} {R s1} :
-  simulation α1 α2 R →
-  initial α1 s1 →
-  ∃ s2, R s1 s2 ∧ initial α2 s2.
-Proof.
-  inversion 1; eauto.
-Qed.
+  close_simulation :
+    ∀ s1 s2,
+    final α1 s1 →
+    R s1 s2 →
+    final α2 s2
+  ;
+
+}.
+
+Arguments init_simulation  {A α1 α2 R} _ {s1} _.
+Arguments step_simulation  {A α1 α2 R} _ {s1 s2 x s'1} _ _.
+Arguments close_simulation {A α1 α2 R} _ {s1 s2} _ _.
 
 Local Ltac init_simulation i2 :=
   match goal with
@@ -309,38 +316,20 @@ Local Ltac init_simulation i2 :=
     pose proof (init_simulation Hsim Hinit) as (i2 & ? & Hinit')
   end.
 
-Lemma simulation_final  {A} {α1 α2 : nauto A} {R} :
-  simulation α1 α2 R →
-  ∀ s1 s2, final α1 s1 → R s1 s2 → final α2 s2.
-Proof.
-  inversion 1; eauto.
-Qed.
-
-Lemma step_simulation_diagram {A} {α1 α2 : nauto A} {R s1 s'1 s2 a} :
-  simulation α1 α2 R →
-  step α1 s1 a s'1 →
-  R s1 s2 →
-  ∃ s'2,
-  step α2 s2 a s'2 ∧
-  R s'1 s'2.
-Proof.
-  inversion 1; eauto.
-Qed.
-
-Local Ltac step_simulation_diagram s :=
+Local Ltac step_simulation s :=
   match goal with
   Hsim: simulation ?α1 ?α2 ?R,
   Hstep: step ?α1 ?s1 ?a ?s'1,
   HR : ?R ?s1 ?s2 |- _ =>
     let Hstep' := fresh Hstep in
     let HR' := fresh HR in
-    pose proof (step_simulation_diagram Hsim Hstep HR)
+    pose proof (step_simulation Hsim Hstep HR)
       as (s & Hstep' & HR');
     clear Hstep HR;
     rename Hstep' into Hstep; rename HR' into HR
   end.
 
-Lemma steps_simulation_diagram {A} {α1 α2 : nauto A} {R s1 s'1 xs} :
+Lemma steps_simulation {A} {α1 α2 : nauto A} {R s1 s'1 xs} :
   simulation α1 α2 R →
   steps α1 s1 xs s'1 →
   ∀ {s2},
@@ -351,19 +340,19 @@ Lemma steps_simulation_diagram {A} {α1 α2 : nauto A} {R s1 s'1 xs} :
 Proof.
   unfold steps. induction 2; intros.
   { eauto with rtcl. }
-  { step_simulation_diagram s'2.
+  { step_simulation s'2.
     edestruct IHrtcl as (s''2 & ? & ?); [ eauto |].
     eauto with rtcl. }
 Qed.
 
-Local Ltac steps_simulation_diagram s :=
+Local Ltac steps_simulation s :=
   match goal with
   Hsim: simulation ?α1 ?α2 ?R,
   Hsteps: steps ?α1 ?s1 ?xs ?s'1,
   HR : ?R ?s1 ?s2 |- _ =>
     let Hsteps' := fresh Hsteps in
     let HR' := fresh HR in
-    pose proof (steps_simulation_diagram Hsim Hsteps HR)
+    pose proof (steps_simulation Hsim Hsteps HR)
       as (s & Hsteps' & HR');
     clear Hsteps HR;
     rename Hsteps' into Hsteps; rename HR' into HR
@@ -393,13 +382,11 @@ Lemma simulation_transitive {A} (α β γ : nauto A) R S :
   simulation β γ S →
   simulation α γ (compose R S).
 Proof.
-  inversion 1; inversion 1. unfold compose. econstructor.
+  intros. unfold compose. econstructor.
   { intros i1 ?. init_simulation i2. init_simulation i3. eauto. }
-  { firstorder. }
   { intros s1 s3 x s'1 Hstep (s2 & HR & HS).
-    step_simulation_diagram s'2.
-    step_simulation_diagram s'3.
-    eauto. }
+    step_simulation s'2. step_simulation s'3. eauto. }
+  { firstorder. }
 Qed.
 
 (* -------------------------------------------------------------------------- *)
@@ -561,11 +548,9 @@ Proof.
   unfold similar. intros (R & Hsim).
   unfold subspace. split.
   { unfold permitted, a2s. intros xs (i1 & s1 & ? & ?).
-    init_simulation i2. steps_simulation_diagram s2.
-    eauto. }
+    init_simulation i2. steps_simulation s2. eauto. }
   { unfold complete, a2s.  intros xs (i1 & s1 & ? & ? & ?).
-    init_simulation i2. steps_simulation_diagram s2.
-    eauto 6 using simulation_final. }
+    init_simulation i2. steps_simulation s2. firstorder. }
 Qed.
 
 (* -------------------------------------------------------------------------- *)
