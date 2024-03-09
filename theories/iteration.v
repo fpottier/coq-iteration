@@ -265,6 +265,32 @@ Arguments initial_exists {A} _.
 Definition steps {A} (α : nauto A) : state α → list A → state α → Prop :=
   rtcl (step α).
 
+(* Trivial properties of [steps]. *)
+
+Lemma steps_nil {A} (α : nauto A) s :
+  steps α s [] s.
+Proof.
+  unfold steps. eauto with rtcl.
+Qed.
+
+Lemma steps_cons {A} (α : nauto A) s1 s2 s3 x xs :
+  step α s1 x s2 →
+  steps α s2 xs s3 →
+  steps α s1 (x :: xs) s3.
+Proof.
+  unfold steps. eauto with rtcl.
+Qed.
+
+Lemma steps_snoc {A} (α : nauto A) s1 s2 s3 x xs :
+  steps α s1 xs s2 →
+  step α s2 x s3 →
+  steps α s1 (snoc xs x) s3.
+Proof.
+  unfold steps. eauto with rtcl.
+Qed.
+
+Global Hint Resolve steps_nil steps_cons steps_snoc : steps.
+
 (* -------------------------------------------------------------------------- *)
 
 (* Similarity of automata. *)
@@ -338,11 +364,11 @@ Lemma steps_simulation {A} {α1 α2 : nauto A} {R s1 s'1 xs} :
   steps α2 s2 xs s'2 ∧
   R s'1 s'2.
 Proof.
-  unfold steps. induction 2; intros.
-  { eauto with rtcl. }
+  induction 2; intros.
+  { eauto with steps. }
   { step_simulation s'2.
     edestruct IHrtcl as (s''2 & ? & ?); [ eauto |].
-    eauto with rtcl. }
+    eauto with steps. }
 Qed.
 
 Local Ltac steps_simulation s :=
@@ -423,7 +449,7 @@ Program Definition a2s {A} (α : nauto A) : space A :=
     complete  xs := ∃ i f, initial α i ∧ steps α i xs f ∧ final α f ;
   |}.
 Next Obligation.
-  destruct (initial_exists α) as (i & ?). unfold steps. eauto with rtcl.
+  destruct (initial_exists α) as (i & ?). eauto with steps.
 Qed.
 Next Obligation.
   unfold steps. induction 2; intros.
