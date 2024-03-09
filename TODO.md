@@ -2,9 +2,6 @@
 
 ## Definitely
 
-* Non-deterministic automata should have multiple initial states,
-  so they are closed under derivative.
-
 * Characterize what it means for an iteration space to be
   deterministic.
 
@@ -23,6 +20,8 @@
   automaton is to use `derivative`. The states of the automaton are iteration
   spaces, and the transitions are given by `derivative`. A state is final if
   `complete []` holds.
+
+* Set up rewriting modulo the preorders on spaces / automata.
 
 ## Maybe
 
