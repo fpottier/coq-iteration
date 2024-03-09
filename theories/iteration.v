@@ -262,6 +262,11 @@ Arguments step           {A} _.
 Arguments final          {A} _.
 Arguments initial_exists {A} _.
 
+Ltac initial_exists i :=
+  match goal with α: nauto _ |- _ =>
+    pose proof (initial_exists α) as (i & ?)
+  end.
+
 Definition steps {A} (α : nauto A) : state α → list A → state α → Prop :=
   rtcl (step α).
 
@@ -290,6 +295,33 @@ Proof.
 Qed.
 
 Global Hint Resolve steps_nil steps_cons steps_snoc : steps.
+
+Definition leadsto {A} (α : nauto A) :=
+  λ xs s, ∃ i, initial α i ∧ steps α i xs s.
+
+Lemma leadsto_initial {A} (α : nauto A) i :
+  initial α i →
+  leadsto α [] i.
+Proof.
+  unfold leadsto. eauto with steps.
+Qed.
+
+Lemma leadsto_snoc {A} (α : nauto A) s s' x xs :
+  leadsto α xs s →
+  step α s x s' →
+  leadsto α (snoc xs x) s'.
+Proof.
+  unfold leadsto. intros (i & ? & ?) ?. eauto with steps.
+Qed.
+
+Global Hint Resolve leadsto_initial leadsto_snoc : leadsto.
+
+Lemma invert_leadsto_snoc {A} (α : nauto A) xs x s' :
+  leadsto α (snoc xs x) s' →
+  ∃ s,
+  leadsto α xs s ∧ step α s x s'.
+Proof.
+Admitted.
 
 (* -------------------------------------------------------------------------- *)
 
@@ -445,11 +477,12 @@ Program Definition s2a {A} (σ : space A) : nauto A :=
 
 Program Definition a2s {A} (α : nauto A) : space A :=
   {|
-    permitted xs := ∃ i s, initial α i ∧ steps α i xs s ;
-    complete  xs := ∃ i f, initial α i ∧ steps α i xs f ∧ final α f ;
+    permitted xs := ∃ s, leadsto α xs s ;
+    complete  xs := ∃ f, leadsto α xs f ∧ final α f ;
   |}.
+
 Next Obligation.
-  destruct (initial_exists α) as (i & ?). eauto with steps.
+  initial_exists i. eauto with leadsto.
 Qed.
 Next Obligation.
   unfold steps. induction 2; intros.
@@ -468,15 +501,6 @@ Qed.
 (* -------------------------------------------------------------------------- *)
 
 (* TODO clean up *)
-
-Lemma foo {A} (σ : space A) :
-  let α := s2a σ in
-  ∀ i xs s,
-  initial α i →
-  steps α i xs s →
-  s = xs.
-Proof.
-Admitted.
 
 Local Lemma edge_target_is_permitted {A} (σ : space A) xs x xs' :
   step (s2a σ) xs x xs' →
@@ -518,48 +542,61 @@ Qed.
    converted back to an iteration space, then the result is [σ]
    again, up to equivalence [≡]. *)
 
+Lemma invert_leadsto_self {A} {σ : space A} {xs s} :
+  leadsto (s2a σ) xs s →
+  s = xs.
+Proof.
+Admitted.
+
+Lemma leadsto_permitted {A} {σ : space A} xs s :
+  leadsto (s2a σ) xs s →
+  permitted σ xs.
+Proof.
+  intros Hleadsto.
+  assert (s = xs) by eauto using invert_leadsto_self. subst s.
+  (* Either this path is empty, or it ends with an edge. *)
+  destruct Hleadsto as (i & Hinit & Hsteps).
+  apply rtcl_rtcl' in Hsteps. dependent destruction Hsteps.
+  (* Case: the path is empty. *)
+  { eapply permitted_empty. }
+  (* Case: the path ends with an edge. *)
+  { clear Hsteps. eauto using edge_target_is_permitted. }
+Qed.
+
+Lemma leadsto_complete {A} {σ : space A} xs s :
+  leadsto (s2a σ) xs s →
+  complete σ s →
+  complete σ xs.
+Proof.
+  intros Hleadsto.
+  assert (s = xs) by eauto using invert_leadsto_self. subst s.
+  eauto.
+Qed.
+
+Local Lemma leadsto_self {A} (σ : space A) :
+  ∀ xs,
+  permitted σ xs →
+  leadsto (s2a σ) xs xs.
+Proof.
+  intros. exists []. split.
+  { reflexivity. }
+  { eauto using steps_self. }
+Qed.
+
 Lemma roundtrip1l {A} (σ : space A) :
   a2s (s2a σ) ⊑ σ.
 Proof.
   unfold a2s. econstructor; simpl; intros xs.
-
-  (* Inclusion of the [permitted] components. *)
-  (* Goal: if in the automaton, out of the initial state, there is
-     a path labeled [xs], then [xs] is permitted. *)
-  { intros (i & s & -> & Hsteps).
-    assert (s = xs); [| subst s ].
-    { eapply foo. reflexivity. exact Hsteps. }
-    (* Either this path is empty, or it ends with an edge. *)
-    apply rtcl_rtcl' in Hsteps. dependent destruction Hsteps.
-    (* Case: the path is empty. *)
-    { eapply permitted_empty. }
-    (* Case: the path ends with an edge. *)
-    { clear Hsteps. eauto using edge_target_is_permitted. }
-  }
-
-  (* Inclusion of the [complete] components. *)
-  (* Goal: if in the automaton, out of the initial state, there is
-     a path labeled [xs] to a final state, then [xs] is complete. *)
-  { intros (i & s & -> & Hsteps & ?).
-    assert (s = xs); [| subst s ].
-    { eapply foo. reflexivity. exact Hsteps. }
-    tauto. }
+  { intros (s & ?). eauto using leadsto_permitted. }
+  { intros (f & ? & ?). eauto using leadsto_complete. }
 Qed.
 
 Lemma roundtrip1r {A} (σ : space A) :
   σ ⊑ a2s (s2a σ).
 Proof.
   unfold a2s. econstructor; simpl; intros xs.
-
-  (* Inclusion of the [permitted] components. *)
-  (* Goal: if [xs] is permitted, then in the automaton, out of the
-     initial state, there is a path labeled [xs]. *)
-  { eauto using steps_self. }
-
-  (* Inclusion of the [complete] components. *)
-  (* Goal: if [xs] is complete then, in the automaton, out of the
-     initial state, there is a path labeled [xs] to a final state. *)
-  { eauto 7 using steps_self, complete_permitted. }
+  { eauto using leadsto_self. }
+  { eauto 7 using leadsto_self, complete_permitted. }
 Qed.
 
 Lemma roundtrip1 {A} (σ : space A) :
@@ -570,12 +607,42 @@ Qed.
 
 (* -------------------------------------------------------------------------- *)
 
+Definition functional {A B} (R : A → B → Prop) :=
+  ∀ a b1 b2, R a b1 → R a b2 → b1 = b2.
+
+Local Ltac functional R :=
+  match goal with h1: R ?a ?b1, h2: R ?a ?b2 |- _ =>
+    let Hfun := fresh in
+    assert (Hfun: functional R) by eauto;
+    pose proof (Hfun _ _ _ h1 h2);
+    clear Hfun;
+    simplify_eq
+  end.
+
+Definition innocent {A} (α : nauto A) :=
+  functional (leadsto α).
+
 Lemma roundtrip2l {A} (α : nauto A) :
-  (* TODO requires [deterministic α] *)
+  innocent α →
   s2a (a2s α) ≼ α.
 Proof.
+  unfold innocent. intro Hfun.
   unfold s2a, a2s; simpl.
-Abort.
+  (* The state [xs] in the automaton [s2a (a2s α)] is simulated by
+     state [s] in automaton [α] if and only if in the automaton [α]
+     the path [xs] leads to the state [s]. In other words, the desired
+     simulation is [leadsto α]. *)
+  exists (leadsto α).
+  econstructor; simpl.
+  { initial_exists i. intros; subst; eauto with leadsto. }
+  { intros xs s x ? (<- & (s' & Hs')) Hs.
+    apply invert_leadsto_snoc in Hs'. destruct Hs' as (? & ? & ?).
+    functional (leadsto α).
+    eauto with leadsto. }
+  { intros xs s (f & ? & ?) ?.
+    functional (leadsto α).
+    eauto. }
+Qed.
 
 Lemma roundtrip2r {A} (α : nauto A) :
   α ≼ s2a (a2s α).
@@ -584,13 +651,10 @@ Proof.
   (* The state [s] in automaton [α] is simulated by the state [xs] in
      the automaton [s2a (a2s α)] if and only if in the automaton [α]
      the state [s] is reachable from some initial state [i] via a path
-     labeled [xs]. *)
-  exists (λ s xs, ∃ i, initial α i ∧ steps α i xs s).
-  econstructor; simpl.
-  { eauto with steps. }
-  { intros s xs x s' Hstep (i & Hinit & Hsteps).
-    eauto 12 with steps. }
-  { firstorder. }
+     labeled [xs]. In other words, the desired simulation is
+     [flip (leadsto α)]. *)
+  exists (flip (leadsto α)).
+  econstructor; simpl; eauto 7 with leadsto.
 Qed.
 
 (* -------------------------------------------------------------------------- *)
@@ -605,9 +669,11 @@ Lemma similar_subspace {A} (α1 α2 : nauto A) :
 Proof.
   unfold similar. intros (R & Hsim).
   unfold subspace. split.
-  { unfold permitted, a2s. intros xs (i1 & s1 & ? & ?).
+  { unfold permitted, a2s.
+    intros xs (s1 & (i1 & ? & ?)). unfold leadsto.
     init_simulation i2. steps_simulation s2. eauto. }
-  { unfold complete, a2s.  intros xs (i1 & s1 & ? & ? & ?).
+  { unfold complete, a2s.
+    intros xs (s1 & (i1 & ? & ?) & ?). unfold leadsto.
     init_simulation i2. steps_simulation s2. firstorder. }
 Qed.
 
