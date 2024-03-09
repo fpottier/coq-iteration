@@ -389,6 +389,13 @@ Proof.
   { firstorder. }
 Qed.
 
+Global Instance similar_reflexive : ∀ A, Reflexive (@similar A).
+Proof. econstructor. eauto using simulation_reflexive. Qed.
+
+Global Instance similar_transitive : ∀ A, Transitive (@similar A).
+Proof. intros A α1 α2 α3 (R & ?) (S & ?).
+       eexists. eauto using simulation_transitive. Qed.
+
 (* -------------------------------------------------------------------------- *)
 
 (* [s2a] converts an iteration space to an automaton. *)
