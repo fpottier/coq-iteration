@@ -21,6 +21,21 @@ Qed.
 Definition snoc {A} (xs : list A) (x : A) :=
   xs ++ [x].
 
+Lemma snoc_inv {A} (xs xs0: list A) (x x0: A) :
+  snoc xs x = snoc xs0 x0 ->
+  xs = xs0 /\ x = x0.
+Proof.
+  intros. generalize dependent xs0.
+  induction xs; unfold snoc; intros xs0 H; destruct xs0; simpl in *;
+    try (simpl in *; inversion H; apply app_cons_not_nil in H2;
+         contradiction).
+  { inversion H. auto. }
+  { inversion H. symmetry in H2. apply app_cons_not_nil in H2.
+    contradiction. }
+  { inversion H; subst. unfold snoc in *.
+    destruct (IHxs _ H2). subst. auto. }
+Qed.
+
 Lemma rev_cons {A} (xs : list A) (x : A) :
   rev (x :: xs) = snoc (rev xs) x.
 Proof.
@@ -156,6 +171,14 @@ Lemma rtcl_rtcl' {S A} (R : S → A → S → Prop) :
   rtcl' R s xs s'.
 Proof.
   induction 1; simpl; eauto with rtcl'.
+Qed.
+
+Lemma rtcl'_rtcl {S A} (R : S → A → S → Prop) :
+  ∀ s xs s',
+  rtcl' R s xs s' →
+  rtcl R s xs s'.
+Proof.
+  induction 1; simpl; eauto with rtcl.
 Qed.
 
 (* -------------------------------------------------------------------------- *)
@@ -403,7 +426,15 @@ Next Obligation.
   unfold steps. eauto with rtcl.
 Qed.
 Next Obligation.
-Admitted.
+  unfold steps. induction 2; intros.
+  { eauto. }
+  { apply IHprefix in H. destruct H.
+    apply rtcl_rtcl' in H. inversion H.
+    { unfold snoc in H3. apply app_cons_not_nil in H3.
+      contradiction. }
+    { apply snoc_inv in H1. destruct H1; subst.
+      exists s2. apply rtcl'_rtcl. auto. } }
+Qed.
 Next Obligation.
   firstorder.
 Qed.
