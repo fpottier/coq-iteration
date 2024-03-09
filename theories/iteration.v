@@ -544,8 +544,8 @@ Qed.
 (* -------------------------------------------------------------------------- *)
 
 (* Similarity is sound: [α1 ≼ α2] implies [a2s α1 ⊑ a2s α2]. That is, if
-   [α1] is simulated by [α2] then the sequences accepted by [α1] form a
-   subset of the sequences accepted by [α2]. *)
+   [α1] is simulated by [α2] then the sequences produced by [α1] form a
+   subset of the sequences produced by [α2]. *)
 
 Lemma similar_subspace {A} (α1 α2 : nauto A) :
   α1 ≼ α2 →
