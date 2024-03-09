@@ -218,7 +218,7 @@ Record space A := {
 }.
 
 Local Obligation Tactic :=
-  (simpl; eauto).
+  (simpl; intros; eauto).
 
 Arguments permitted {A} _.
 Arguments complete  {A} _.
@@ -250,16 +250,18 @@ Program Definition top {A} : space A :=
 (* These are not necessarily finite-state automata. *)
 
 Record nauto A := {
-  state     : Type;
-  initial   : state;
-  step      : state → A → state → Prop;
-  final     : state → Prop;
+  state          : Type;
+  initial        : state → Prop;
+  step           : state → A → state → Prop;
+  final          : state → Prop;
+  initial_exists : ∃ i, initial i;
 }.
 
-Arguments state   {A} _.
-Arguments initial {A} _.
-Arguments step    {A} _.
-Arguments final   {A} _.
+Arguments state          {A} _.
+Arguments initial        {A} _.
+Arguments step           {A} _.
+Arguments final          {A} _.
+Arguments initial_exists {A} _.
 
 Definition steps {A} (α : nauto A) : state α → list A → state α → Prop :=
   rtcl (step α).
@@ -277,7 +279,7 @@ Inductive simulation {A}
   (R : state α1 → state α2 → Prop)
 : Prop :=
 | Sim :
-    R (initial α1) (initial α2) →
+    (∀ s1, initial α1 s1 → ∃ s2, R s1 s2 ∧ initial α2 s2) →
     (∀ s1 s2, final α1 s1 → R s1 s2 → final α2 s2) →
     (∀ s1 s2 a s'1,
       step α1 s1 a s'1 →
@@ -290,17 +292,21 @@ Inductive simulation {A}
 
 (* TODO [simulation] could be a record?
    then the following lemmas would be the projections *)
-Lemma init_simulation  {A} {α1 α2 : nauto A} {R} :
+
+Lemma init_simulation {A} {α1 α2 : nauto A} {R s1} :
   simulation α1 α2 R →
-  R (initial α1) (initial α2).
+  initial α1 s1 →
+  ∃ s2, R s1 s2 ∧ initial α2 s2.
 Proof.
   inversion 1; eauto.
 Qed.
 
-Local Ltac init_simulation :=
+Local Ltac init_simulation i2 :=
   match goal with
-  Hsim: simulation ?α1 ?α2 ?R |- _ =>
-    pose proof (init_simulation Hsim)
+  Hsim: simulation ?α1 ?α2 ?R,
+  Hinit: initial ?α1 ?i1 |- _ =>
+    let Hinit' := fresh Hinit in
+    pose proof (init_simulation Hsim Hinit) as (i2 & ? & Hinit')
   end.
 
 Lemma simulation_final  {A} {α1 α2 : nauto A} {R} :
@@ -388,9 +394,9 @@ Lemma simulation_transitive {A} (α β γ : nauto A) R S :
   simulation α γ (compose R S).
 Proof.
   inversion 1; inversion 1. unfold compose. econstructor.
-  { eauto. }
+  { intros i1 ?. init_simulation i2. init_simulation i3. eauto. }
   { firstorder. }
-  { intros s1 s3 a s'1 Hstep (s2 & HR & HS).
+  { intros s1 s3 x s'1 Hstep (s2 & HR & HS).
     step_simulation_diagram s'2.
     step_simulation_diagram s'3.
     eauto. }
@@ -405,12 +411,12 @@ Qed.
    root (the automaton's initial state) is the empty list, and where every
    state other than the root has exactly one parent. *)
 
-Definition s2a {A} (σ : space A) : nauto A :=
+Program Definition s2a {A} (σ : space A) : nauto A :=
   {|
-    state   := list A;
-    initial := [];
-    step xs x xs' := (snoc xs x = xs') ∧ permitted σ xs';
-    final   := complete σ
+    state         := list A ;
+    initial xs    := xs = [] ;
+    step xs x xs' := (snoc xs x = xs') ∧ permitted σ xs' ;
+    final xs      := complete σ xs ;
   |}.
 
 (* -------------------------------------------------------------------------- *)
@@ -419,11 +425,11 @@ Definition s2a {A} (σ : space A) : nauto A :=
 
 Program Definition a2s {A} (α : nauto A) : space A :=
   {|
-    permitted xs := ∃ s, steps α (initial α) xs s;
-    complete  xs := ∃ s, steps α (initial α) xs s ∧ final α s;
+    permitted xs := ∃ i s, initial α i ∧ steps α i xs s ;
+    complete  xs := ∃ i f, initial α i ∧ steps α i xs f ∧ final α f ;
   |}.
 Next Obligation.
-  unfold steps. eauto with rtcl.
+  destruct (initial_exists α) as (i & ?). unfold steps. eauto with rtcl.
 Qed.
 Next Obligation.
   unfold steps. induction 2; intros.
@@ -445,8 +451,9 @@ Qed.
 
 Lemma foo {A} (σ : space A) :
   let α := s2a σ in
-  ∀ xs s,
-  steps α (initial α) xs s →
+  ∀ i xs s,
+  initial α i →
+  steps α i xs s →
   s = xs.
 Proof.
 Admitted.
@@ -499,9 +506,9 @@ Proof.
   (* Inclusion of the [permitted] components. *)
   (* Goal: if in the automaton, out of the initial state, there is
      a path labeled [xs], then [xs] is permitted. *)
-  { intros (s & Hsteps).
+  { intros (i & s & -> & Hsteps).
     assert (s = xs); [| subst s ].
-    { eapply foo. exact Hsteps. }
+    { eapply foo. reflexivity. exact Hsteps. }
     (* Either this path is empty, or it ends with an edge. *)
     apply rtcl_rtcl' in Hsteps. dependent destruction Hsteps.
     (* Case: the path is empty. *)
@@ -513,9 +520,9 @@ Proof.
   (* Inclusion of the [complete] components. *)
   (* Goal: if in the automaton, out of the initial state, there is
      a path labeled [xs] to a final state, then [xs] is complete. *)
-  { intros (s & Hsteps & ?).
+  { intros (i & s & -> & Hsteps & ?).
     assert (s = xs); [| subst s ].
-    { eapply foo. exact Hsteps. }
+    { eapply foo. reflexivity. exact Hsteps. }
     tauto. }
 Qed.
 
@@ -532,7 +539,7 @@ Proof.
   (* Inclusion of the [complete] components. *)
   (* Goal: if [xs] is complete then, in the automaton, out of the
      initial state, there is a path labeled [xs] to a final state. *)
-  { eauto using steps_self, complete_permitted. }
+  { eauto 7 using steps_self, complete_permitted. }
 Qed.
 
 Lemma roundtrip1 {A} (σ : space A) :
@@ -553,12 +560,12 @@ Lemma similar_subspace {A} (α1 α2 : nauto A) :
 Proof.
   unfold similar. intros (R & Hsim).
   unfold subspace. split.
-  { unfold permitted, a2s. intros xs (s1 & ?).
-    init_simulation. steps_simulation_diagram s2.
+  { unfold permitted, a2s. intros xs (i1 & s1 & ? & ?).
+    init_simulation i2. steps_simulation_diagram s2.
     eauto. }
-  { unfold complete, a2s.  intros xs (s1 & ? & ?).
-    init_simulation. steps_simulation_diagram s2.
-    eauto using simulation_final. }
+  { unfold complete, a2s.  intros xs (i1 & s1 & ? & ? & ?).
+    init_simulation i2. steps_simulation_diagram s2.
+    eauto 6 using simulation_final. }
 Qed.
 
 (* -------------------------------------------------------------------------- *)
