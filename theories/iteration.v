@@ -570,6 +570,31 @@ Qed.
 
 (* -------------------------------------------------------------------------- *)
 
+Lemma roundtrip2l {A} (α : nauto A) :
+  (* TODO requires [deterministic α] *)
+  s2a (a2s α) ≼ α.
+Proof.
+  unfold s2a, a2s; simpl.
+Abort.
+
+Lemma roundtrip2r {A} (α : nauto A) :
+  α ≼ s2a (a2s α).
+Proof.
+  unfold s2a, a2s; simpl.
+  (* The state [s] in automaton [α] is simulated by the state [xs] in
+     the automaton [s2a (a2s α)] if and only if in the automaton [α]
+     the state [s] is reachable from some initial state [i] via a path
+     labeled [xs]. *)
+  exists (λ s xs, ∃ i, initial α i ∧ steps α i xs s).
+  econstructor; simpl.
+  { eauto with steps. }
+  { intros s xs x s' Hstep (i & Hinit & Hsteps).
+    eauto 12 with steps. }
+  { firstorder. }
+Qed.
+
+(* -------------------------------------------------------------------------- *)
+
 (* Similarity is sound: [α1 ≼ α2] implies [a2s α1 ⊑ a2s α2]. That is, if
    [α1] is simulated by [α2] then the sequences produced by [α1] form a
    subset of the sequences produced by [α2]. *)
