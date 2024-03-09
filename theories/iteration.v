@@ -270,7 +270,7 @@ Definition steps {A} (α : nauto A) : state α → list A → state α → Prop 
 
 (* [simulation α1 α2 R] means that the relation [R] is a simulation
    between the automata [α1] and [α2]. This implies that every sequence
-   that is accepted by [α1] is also accepted by [α2]. *)
+   that can be produced by [α1] can also be produced by [α2]. *)
 
 Inductive simulation {A}
   (α1 α2 : nauto A)
