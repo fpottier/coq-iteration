@@ -25,10 +25,14 @@ Definition snoc {A} (xs : list A) (x : A) :=
 
 Local Ltac simplify_list_eq :=
   repeat match goal with
-  | h: _ ++ [_] = _ ++ [_] |- _ =>
-      apply app_inj_tail in h; destruct h; simplify_eq
+  | h: snoc _ _ = snoc _ _ |- _ =>
+      unfold snoc in h
   | h : [] = snoc _ _ |- _ =>
-      apply app_cons_not_nil in h; tauto
+      unfold snoc in h
+  | h : snoc _ _ = [] |- _ =>
+      unfold snoc in h
+  | h: _ ++ [_] = _ ++ [_] |- _ =>
+      apply app_inj_tail in h; destruct h as (? & ?); simplify_eq
   | h : [] = _ ++ _ :: _ |- _ =>
       apply app_cons_not_nil in h; tauto
   | h : _ ++ _ :: _ = [] |- _ =>
@@ -44,10 +48,14 @@ Qed.
 
 Local Ltac simplify_list_eq ::=
   repeat match goal with
-  | h: _ ++ [_] = _ ++ [_] |- _ =>
-      apply app_inj_tail in h; destruct h; simplify_eq
+  | h: snoc _ _ = snoc _ _ |- _ =>
+      unfold snoc in h
   | h : [] = snoc _ _ |- _ =>
-      apply app_cons_not_nil in h; tauto
+      unfold snoc in h
+  | h : snoc _ _ = [] |- _ =>
+      unfold snoc in h
+  | h: _ ++ [_] = _ ++ [_] |- _ =>
+      apply app_inj_tail in h; destruct h as (? & ?); simplify_eq
   | h : [] = _ ++ _ :: _ |- _ =>
       apply app_cons_not_nil in h; tauto
   | h : _ ++ _ :: _ = [] |- _ =>
@@ -59,8 +67,8 @@ Local Ltac simplify_list_eq ::=
       symmetry in h
   end.
 
-Lemma invert_rev_eq_rev {A} :
-  ∀ (xs ys : list A),
+Lemma rev_injective {A} :
+  ∀ xs ys : list A,
   rev xs = rev ys →
   xs = ys.
 Proof.
@@ -72,10 +80,14 @@ Qed.
 
 Local Ltac simplify_list_eq ::=
   repeat match goal with
-  | h: _ ++ [_] = _ ++ [_] |- _ =>
-      apply app_inj_tail in h; destruct h; simplify_eq
+  | h: snoc _ _ = snoc _ _ |- _ =>
+      unfold snoc in h
   | h : [] = snoc _ _ |- _ =>
-      apply app_cons_not_nil in h; tauto
+      unfold snoc in h
+  | h : snoc _ _ = [] |- _ =>
+      unfold snoc in h
+  | h: _ ++ [_] = _ ++ [_] |- _ =>
+      apply app_inj_tail in h; destruct h as (? & ?); simplify_eq
   | h : [] = _ ++ _ :: _ |- _ =>
       apply app_cons_not_nil in h; tauto
   | h : _ ++ _ :: _ = [] |- _ =>
@@ -86,7 +98,7 @@ Local Ltac simplify_list_eq ::=
   | h: [] = rev ?xs |- _ =>
       symmetry in h
   | h: rev ?xs = rev ?ys |- _ =>
-      apply invert_rev_eq_rev in h;
+      apply rev_injective in h;
       simplify_eq
   end.
 
@@ -101,40 +113,6 @@ Lemma rev_snoc {A} (xs : list A) (x : A) :
 Proof.
   unfold snoc. rewrite rev_app_distr. reflexivity.
 Qed.
-
-Lemma snoc_inv {A} (xs xs0: list A) (x x0: A) :
-  snoc xs x = snoc xs0 x0 ->
-  xs = xs0 /\ x = x0.
-Proof.
-  intros Heq.
-  rewrite <- (rev_involutive xs) in Heq.
-  rewrite <- (rev_involutive xs0) in Heq.
-  rewrite <- !rev_cons in Heq.
-  simplify_list_eq. eauto.
-Qed.
-
-Local Ltac simplify_list_eq ::=
-  repeat match goal with
-  | h: _ ++ [_] = _ ++ [_] |- _ =>
-      apply app_inj_tail in h; destruct h; simplify_eq
-  | h : [] = snoc _ _ |- _ =>
-      apply app_cons_not_nil in h; tauto
-  | h : [] = _ ++ _ :: _ |- _ =>
-      apply app_cons_not_nil in h; tauto
-  | h : _ ++ _ :: _ = [] |- _ =>
-      symmetry in h
-  | h: rev ?xs = [] |- _ =>
-      apply invert_rev_eq_nil in h;
-      simplify_eq
-  | h: [] = rev ?xs |- _ =>
-      symmetry in h
-  | h: rev ?xs = rev ?ys |- _ =>
-      apply invert_rev_eq_rev in h;
-      simplify_eq
-  | h: snoc _ _ = snoc _ _ |- _ =>
-      apply snoc_inv in h;
-      simplify_eq
-  end.
 
 Lemma app_cons_eq_snoc_app {A} (xs ys : list A) y :
   xs ++ y :: ys  = snoc xs y ++ ys.
@@ -394,7 +372,6 @@ Proof.
   { eauto. }
   { apply IHprefix in H. destruct H.
     apply rtcl_rtcl' in H. inversion H; simplify_list_eq.
-    destruct H1; subst. (* TODO *)
     eauto using rtcl'_rtcl. }
 Qed.
 
