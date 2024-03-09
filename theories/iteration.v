@@ -560,6 +560,16 @@ Proof.
     init_simulation i2. steps_simulation s2. firstorder. }
 Qed.
 
+Lemma subspace_similar {A} (σ1 σ2 : space A) :
+  σ1 ⊑ σ2 →
+  s2a σ1 ≼ s2a σ2.
+Proof.
+  unfold subspace. intros (? & ?).
+  (* The desired simulation relation is just equality. *)
+  unfold similar. exists eq.
+  econstructor; simpl; intros; subst; intuition eauto.
+Qed.
+
 (* -------------------------------------------------------------------------- *)
 
 Module SpaceNotations.
