@@ -20,20 +20,75 @@ Qed.
 Definition snoc {A} (xs : list A) (x : A) :=
   xs ++ [x].
 
-Lemma snoc_inv {A} (xs xs0: list A) (x x0: A) :
-  snoc xs x = snoc xs0 x0 ->
-  xs = xs0 /\ x = x0.
+(* TODO can we find an elegant way of incrementally extending the tactic
+        [simplify_list_eq] as we go? use type classes? *)
+
+Local Ltac simplify_list_eq :=
+  repeat match goal with
+  | h: _ ++ [_] = _ ++ [_] |- _ =>
+      apply app_inj_tail in h; destruct h; simplify_eq
+  | h : [] = snoc _ _ |- _ =>
+      apply app_cons_not_nil in h; tauto
+  | h : [] = _ ++ _ :: _ |- _ =>
+      apply app_cons_not_nil in h; tauto
+  | h : _ ++ _ :: _ = [] |- _ =>
+      symmetry in h
+  end.
+
+Lemma invert_rev_eq_nil {A} (xs : list A) :
+  rev xs = [] →
+  xs = [].
 Proof.
-  intros. generalize dependent xs0.
-  induction xs; unfold snoc; intros xs0 H; destruct xs0; simpl in *;
-    try (simpl in *; inversion H; apply app_cons_not_nil in H2;
-         contradiction).
-  { inversion H. auto. }
-  { inversion H. symmetry in H2. apply app_cons_not_nil in H2.
-    contradiction. }
-  { inversion H; subst. unfold snoc in *.
-    destruct (IHxs _ H2). subst. auto. }
+  destruct xs as [| x xs ]; simpl; intros; simplify_list_eq; eauto.
 Qed.
+
+Local Ltac simplify_list_eq ::=
+  repeat match goal with
+  | h: _ ++ [_] = _ ++ [_] |- _ =>
+      apply app_inj_tail in h; destruct h; simplify_eq
+  | h : [] = snoc _ _ |- _ =>
+      apply app_cons_not_nil in h; tauto
+  | h : [] = _ ++ _ :: _ |- _ =>
+      apply app_cons_not_nil in h; tauto
+  | h : _ ++ _ :: _ = [] |- _ =>
+      symmetry in h
+  | h: rev ?xs = [] |- _ =>
+      apply invert_rev_eq_nil in h;
+      simplify_eq
+  | h: [] = rev ?xs |- _ =>
+      symmetry in h
+  end.
+
+Lemma invert_rev_eq_rev {A} :
+  ∀ (xs ys : list A),
+  rev xs = rev ys →
+  xs = ys.
+Proof.
+  induction xs as [| x xs ]; simpl; intros ys ?.
+  { simplify_list_eq. eauto. }
+  destruct ys as [| y ys ]; simpl in *; simplify_list_eq.
+  f_equal; eauto.
+Qed.
+
+Local Ltac simplify_list_eq ::=
+  repeat match goal with
+  | h: _ ++ [_] = _ ++ [_] |- _ =>
+      apply app_inj_tail in h; destruct h; simplify_eq
+  | h : [] = snoc _ _ |- _ =>
+      apply app_cons_not_nil in h; tauto
+  | h : [] = _ ++ _ :: _ |- _ =>
+      apply app_cons_not_nil in h; tauto
+  | h : _ ++ _ :: _ = [] |- _ =>
+      symmetry in h
+  | h: rev ?xs = [] |- _ =>
+      apply invert_rev_eq_nil in h;
+      simplify_eq
+  | h: [] = rev ?xs |- _ =>
+      symmetry in h
+  | h: rev ?xs = rev ?ys |- _ =>
+      apply invert_rev_eq_rev in h;
+      simplify_eq
+  end.
 
 Lemma rev_cons {A} (xs : list A) (x : A) :
   rev (x :: xs) = snoc (rev xs) x.
@@ -46,6 +101,40 @@ Lemma rev_snoc {A} (xs : list A) (x : A) :
 Proof.
   unfold snoc. rewrite rev_app_distr. reflexivity.
 Qed.
+
+Lemma snoc_inv {A} (xs xs0: list A) (x x0: A) :
+  snoc xs x = snoc xs0 x0 ->
+  xs = xs0 /\ x = x0.
+Proof.
+  intros Heq.
+  rewrite <- (rev_involutive xs) in Heq.
+  rewrite <- (rev_involutive xs0) in Heq.
+  rewrite <- !rev_cons in Heq.
+  simplify_list_eq. eauto.
+Qed.
+
+Local Ltac simplify_list_eq ::=
+  repeat match goal with
+  | h: _ ++ [_] = _ ++ [_] |- _ =>
+      apply app_inj_tail in h; destruct h; simplify_eq
+  | h : [] = snoc _ _ |- _ =>
+      apply app_cons_not_nil in h; tauto
+  | h : [] = _ ++ _ :: _ |- _ =>
+      apply app_cons_not_nil in h; tauto
+  | h : _ ++ _ :: _ = [] |- _ =>
+      symmetry in h
+  | h: rev ?xs = [] |- _ =>
+      apply invert_rev_eq_nil in h;
+      simplify_eq
+  | h: [] = rev ?xs |- _ =>
+      symmetry in h
+  | h: rev ?xs = rev ?ys |- _ =>
+      apply invert_rev_eq_rev in h;
+      simplify_eq
+  | h: snoc _ _ = snoc _ _ |- _ =>
+      apply snoc_inv in h;
+      simplify_eq
+  end.
 
 Lemma app_cons_eq_snoc_app {A} (xs ys : list A) y :
   xs ++ y :: ys  = snoc xs y ++ ys.
@@ -296,6 +385,21 @@ Qed.
 
 Global Hint Resolve steps_nil steps_cons steps_snoc : steps.
 
+Lemma steps_prefix {A} {α : nauto A} {i xs xs' s'} :
+  steps α i xs' s' →
+  xs ⊆ xs' →
+  ∃ s, steps α i xs s.
+Proof.
+  unfold steps. induction 2; intros.
+  { eauto. }
+  { apply IHprefix in H. destruct H.
+    apply rtcl_rtcl' in H. inversion H; simplify_list_eq.
+    destruct H1; subst. (* TODO *)
+    eauto using rtcl'_rtcl. }
+Qed.
+
+(* -------------------------------------------------------------------------- *)
+
 Definition leadsto {A} (α : nauto A) :=
   λ xs s, ∃ i, initial α i ∧ steps α i xs s.
 
@@ -322,6 +426,16 @@ Lemma invert_leadsto_snoc {A} (α : nauto A) xs x s' :
   leadsto α xs s ∧ step α s x s'.
 Proof.
 Admitted.
+
+Lemma leadsto_prefix {A} (α : nauto A) xs xs' s' :
+  leadsto α xs' s' →
+  xs ⊆ xs' →
+  ∃ s, leadsto α xs s.
+Proof.
+  unfold leadsto. intros (i & ? & Hsteps) Hprefix.
+  pose proof (steps_prefix Hsteps Hprefix) as (s & ?).
+  eauto.
+Qed.
 
 (* -------------------------------------------------------------------------- *)
 
@@ -485,14 +599,8 @@ Next Obligation.
   initial_exists i. eauto with leadsto.
 Qed.
 Next Obligation.
-  unfold steps. induction 2; intros.
-  { eauto. }
-  { apply IHprefix in H. destruct H.
-    apply rtcl_rtcl' in H. inversion H.
-    { unfold snoc in H3. apply app_cons_not_nil in H3.
-      contradiction. }
-    { apply snoc_inv in H1. destruct H1; subst.
-      exists s2. apply rtcl'_rtcl. auto. } }
+  match goal with h: ∃ s, _ |- _ => destruct h end.
+  eauto using leadsto_prefix.
 Qed.
 Next Obligation.
   firstorder.
