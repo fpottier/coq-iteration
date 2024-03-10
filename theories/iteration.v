@@ -742,6 +742,42 @@ Proof.
   econstructor; simpl; eauto 7 with leadsto.
 Qed.
 
+(* For [leadsto α] to be functional, the automaton [α] must have at
+   most one initial state, and [step α] must be functional. These
+   are necessary and sufficient conditions. *)
+
+Lemma prove_innocent {A} (α : nauto A) :
+  (∀ i1 i2, initial α i1 → initial α i2 → i1 = i2) →
+  (functional (λ '(s, x) s', step α s x s')) →
+  innocent α.
+Proof.
+Admitted.
+
+(* The automaton produced by [s2a] is innocent. *)
+
+Lemma s2a_innocent {A} (σ : space A) :
+  innocent (s2a σ).
+Proof.
+  eapply prove_innocent; simpl.
+  { congruence. }
+  { intros [xs x] xs1 xs2 [? _] [? _]. congruence. }
+Qed.
+
+(* Thus, every automaton [α] is simulated by an innocent automaton [α'],
+   which describes the same iteration space. *)
+
+Lemma innocence_is_possible {A} (α : nauto A) :
+  ∃ α',
+  innocent α' ∧
+  α ≼ α' ∧
+  a2s α' ≡ a2s α.
+Proof.
+  exists (s2a (a2s α)). split; [| split ].
+  { eauto using s2a_innocent. }
+  { eauto using roundtrip2r. }
+  { eauto using roundtrip1. }
+Qed.
+
 (* -------------------------------------------------------------------------- *)
 
 (* Similarity is sound: [α1 ≼ α2] implies [a2s α1 ⊑ a2s α2]. That is, if
