@@ -30,6 +30,12 @@
   a non-deterministic one.
   Note that a deterministic automaton is isomorphic
   to a (finite or infinite) stream.
+  Note that a deterministic automaton is just a chain.
+  Note that these automata are not the same as the automata that are
+  usually taught, because they are not necessarily finite-state, and
+  because they describe *producers*, not *recognizers*.
+  In particular, a non-deterministic automaton cannot be
+  converted to an equivalent deterministic automaton.
 
 * Define non-deterministic automata with ε transitions. Define conversions
   (both ways) between them and ordinary non-deterministic automata.
