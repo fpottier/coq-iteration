@@ -363,6 +363,16 @@ Qed.
 
 Global Hint Resolve steps_nil steps_cons steps_snoc : steps.
 
+Lemma steps_rtlc' {A} (α : nauto A) i s xs :
+  steps α i xs s ->
+  rtcl' (step α) i xs s.
+Proof. eauto using rtcl_rtcl'. Qed.
+
+Lemma rtlc'_steps {A} (α : nauto A) i s xs :
+  rtcl' (step α) i xs s ->
+  steps α i xs s.
+Proof. apply rtcl'_rtcl. Qed.
+
 Lemma steps_prefix {A} {α : nauto A} {i xs xs' s'} :
   steps α i xs' s' →
   xs ⊆ xs' →
