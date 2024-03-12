@@ -407,12 +407,29 @@ Qed.
 
 Global Hint Resolve leadsto_initial leadsto_snoc : leadsto.
 
+Lemma rtlc'_leadsto {A} (α : nauto A) i xs s:
+  initial α i ->
+  rtcl' (step α) i xs s ->
+  leadsto α xs s.
+Proof.
+  intros. unfold leadsto. exists i.
+  split; [assumption | eauto using rtlc'_steps].
+Qed.
+
+Ltac simplify_steps_snoc :=
+  match goal with
+  | h: steps _ _ (snoc _ _ ) _ |- _ =>
+      apply rtcl_rtcl' in h; inversion h; subst; simplify_list_eq
+  end.
+
 Lemma invert_leadsto_snoc {A} (α : nauto A) xs x s' :
   leadsto α (snoc xs x) s' →
   ∃ s,
   leadsto α xs s ∧ step α s x s'.
 Proof.
-Admitted.
+  intros (i & ? & ?). simplify_steps_snoc.
+  exists s2. eauto using rtlc'_leadsto.
+Qed.
 
 Lemma leadsto_prefix {A} (α : nauto A) xs xs' s' :
   leadsto α xs' s' →
