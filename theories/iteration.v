@@ -172,7 +172,23 @@ Proof.
   eauto with prefix.
 Qed.
 
-Local Hint Resolve prefix_app : prefix.
+Lemma prefix_singleton {A} :
+  forall x : A,
+  nil ⊆ [x].
+Proof.
+  intros x. change [x] with (snoc [] x). eauto with prefix.
+Qed.
+
+Lemma prefix_nil {A} :
+  forall xs : list A,
+  nil ⊆ xs.
+Proof.
+  intros xs. destruct xs as [| x xs']; eauto with prefix.
+  change (x :: xs') with ([x] ++ xs').
+  eauto using prefix_app, prefix_transitive.
+Qed.
+
+Local Hint Resolve prefix_app prefix_transitive prefix_nil : prefix.
 
 (* -------------------------------------------------------------------------- *)
 
