@@ -858,3 +858,53 @@ Module SpaceNotations.
   Infix "≡" := eqspace (at level 70, no associativity).
   Infix "≼" := similar (at level 70, no associativity).
 End SpaceNotations.
+
+(* -------------------------------------------------------------------------- *)
+
+(* Combinator for enumerating the elements of list [xs], in order. *)
+
+(* TODO give a better name to this combinator *)
+(* FIXME? should this combinator be a record? *)
+
+Module EnumerateList.
+
+  Variable A : Type.
+  Variable xs : list A.
+
+  Program Definition create : space A :=
+    {|
+      permitted ys := ys ⊆ xs ;
+      complete  ys := ys = xs ;
+    |}.
+  Next Obligation.
+    eauto with prefix.
+  Qed.
+  Next Obligation.
+    eauto with prefix.
+  Qed.
+  Next Obligation.
+    subst xs0. constructor.
+  Qed.
+
+End EnumerateList.
+
+(* Combinator for enumerating integers from [i] up to [j], expressed as an
+   interation space. *)
+
+(* TODO give a better name to this combinator *)
+(* FIXME? should this combinator be a record? *)
+
+(* Module EnumerateItoJ. *)
+(*   (* TODO change later to Z *) *)
+(*   Variable i : nat. *)
+(*   Variable j : nat. *)
+
+(*   Inductive walk : nat -> list nat -> Prop := *)
+(*   | walk_done : forall x, *)
+(*       walk x (x::[]) *)
+(*   | walk_next : forall *)
+
+(*   Definition create : (space nat) := *)
+(*     {| permitted xs := |}. *)
+
+(* End EnumerateItoJ. *)
