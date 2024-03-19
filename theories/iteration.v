@@ -868,10 +868,7 @@ End SpaceNotations.
 
 Module EnumerateList.
 
-  Variable A : Type.
-  Variable xs : list A.
-
-  Program Definition create : space A :=
+  Program Definition create {A} (xs: list A): space A :=
     {|
       permitted ys := ys ⊆ xs ;
       complete  ys := ys = xs ;
