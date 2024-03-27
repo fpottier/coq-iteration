@@ -50,7 +50,7 @@ if ε transitions are allowed (Thompson's construction).
 
 * the empty sequence.
 * a singleton sequence.
-* the union of two (or more) iteration spaces.
+* the union of two (or more) iteration spaces. 
 * the intersection of two (or more) iteration spaces.
 * the concatenation of two iteration spaces.
 * the repetition (Kleene star) of an iteration space.

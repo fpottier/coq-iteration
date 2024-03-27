@@ -192,12 +192,13 @@ Lemma prefix_nil {A} :
   forall xs : list A,
   xs ⊆ [] ->
   xs = [].
-Proof.
-  induction xs.
+Proof. intros.                
+  destruct xs.
   { eauto. }
-  { intros. inversion H; subst.
-
-Local Hint Resolve prefix_app prefix_transitive nil_prefix : prefix.
+  { intros. 
+    
+Admitted.
+Local Hint Resolve prefix_app prefix_transitive nil_prefix prefix_nil : prefix.
 
 (* -------------------------------------------------------------------------- *)
 
@@ -904,23 +905,213 @@ Module EnumerateList.
       final   := (fun ys => ys = xs);
     |}.
 
-  Lemma roundt {A} (xs: list A) :
-    a2s (s2a (create xs)) ≡ (create xs).
-  Proof. apply roundtrip1. Qed.
-
   Lemma list_equiv :
     forall A (xs: list A), (create xs) ⊑ a2s (create_nauto xs).
   Proof.
   Admitted.
+End EnumerateList.
 
-  Program Definition create_empty {A} : space A :=
+Module EnumerateEmpty.
+  
+  Program Definition create_space : space unit :=
     {|
       permitted ys := ys = [] ;
-      complete  ys := True ;
+      complete  ys := ys = [] ;
     |}.
   Next Obligation.
+    subst.
+    eauto using prefix_nil.
+  Qed.
 
-End EnumerateList.
+  Program Definition create_nauto : nauto unit :=
+    {|
+      state   := unit;
+      initial := (fun _ => True) ;
+      step    := (fun _ _ _ => False);
+      final   := (fun _ => True);
+    |}.
+  Next Obligation.
+    exists tt. auto.
+  Qed.
+
+  Lemma equiv :
+    create_space ≡ a2s create_nauto.
+  Proof.
+    split; split.
+    - intros. inversion H. subst. simpl.
+      exists tt. unfold leadsto.
+      exists tt. split.
+      + simpl. auto.
+      + unfold steps. constructor.
+    - intros. inversion H. subst.
+      simpl. exists tt. split; auto. unfold leadsto. exists tt.
+      split; simpl. auto. eauto with steps.
+    - intros.
+      simpl.
+      destruct xs.
+      + auto.
+      + inversion H.
+        inversion H0.
+        destruct H1. inversion H2. inversion H6.
+    - intros. simpl. inversion H.
+      destruct H0. inversion H0.
+      destruct H2. inversion H3. auto. inversion H4.      
+  Qed.
+
+  Lemma equiv2 : 
+    s2a create_space ≼ create_nauto.
+  Proof.
+    simpl.
+    split with (fun _ _ => True).
+  Admitted.
+    
+End EnumerateEmpty.
+
+Module EnumerateSingle.  
+
+  Program Definition create_space {A} (x : A) : space A :=
+    {|
+      permitted ys := ys ⊆ [x];
+      complete  ys := ys = [x];
+    |}.
+  Next Obligation.
+    eauto with prefix.
+  Qed.
+  Next Obligation. 
+    eauto with prefix.
+  Qed.
+  Next Obligation.
+    subst. constructor.
+  Qed.
+  
+  Program Definition create_nauto {A} (x : A) : nauto A :=
+    {|
+      state   := Prop;
+      initial := (fun s => s) ;
+      step    := (fun s1 n s2 => n = x /\ s1 /\ ~s2);
+      final   := (fun s2 => ~s2);
+    |}.
+  Next Obligation.
+    exists True. auto.
+  Qed.
+
+  Lemma equiv :
+    forall A (x:A), create_space x ≡ a2s (create_nauto x).
+  Proof.
+    Admitted.
+End EnumerateSingle.
+
+Require Import Field.
+
+Module EnumerateRangeIncr.
+
+  Inductive incr : nat -> nat -> list nat -> Prop :=
+  |Incr_base : forall x,
+      incr x x []
+  |Incr_prev : forall x1 x2 l,
+      incr x1 x2 l -> incr (S x1) x2 (x1::l).
+    
+  Program Definition create_space (n : nat) (j : nat) {H: n <= j} : space nat :=
+    {|
+      permitted ys :=
+        length ys <= j /\ incr (j - length ys) j ys;
+      complete  ys := incr n j ys;
+    |}.
+  Next Obligation.
+    rewrite PeanoNat.Nat.sub_0_r.
+    split. apply PeanoNat.Nat.le_0_l. constructor.
+  Qed.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+    induction xs.
+    - simpl.    rewrite PeanoNat.Nat.sub_0_r. split. apply PeanoNat.Nat.le_0_l. constructor.
+    - simpl. Admitted.
+
+  Program Definition create_nauto (n1 : nat) (n2 : nat) {H: n1 <= n2} : nauto nat :=
+    {|
+      state   := nat;
+      initial := (fun s => s = n1) ;
+      step    :=
+        (fun s1 n s2 => n = s1 /\ s2 = n + 1 /\ s2 <= n2);
+      final   := (fun s2 => s2 = n2);
+    |}.
+
+End EnumerateRangeIncr.
+
+Module EnumerateInfiniteStream
+.
+
+  Fixpoint valid_seq
+    {A} (l:list A) (n : nat) (f : nat -> A) : Prop :=
+    match l with
+    |[] => True
+    |x::t => x = f n /\ valid_seq t (n+1) f
+    end.
+  
+  Program Definition create_space {A} (f: nat -> A) : space A := 
+    {|
+      permitted ys := valid_seq ys 0 f;
+      complete  ys := False;
+    |}.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+    inversion H.
+  Qed.
+
+
+  Program Definition create_nauto {A} (f: nat -> A) : nauto A :=
+    {|
+      state   := nat;
+      initial := (fun s => s = 0) ;
+      step    :=
+        (fun s1 n s2 => s2 = s1 + 1 /\ n = f s1);
+      final   := (fun s2 => False);
+    |}.
+  
+End EnumerateInfiniteStream.
+
+Module EnumerateSet.
+  Require Import TLC.LibSet.
+  Require Import TLC.LibList.
+
+  Program Definition
+    create_space {A} (E: A -> Prop) : space A := 
+    {|
+      permitted ys :=
+        noduplicates ys /\ forall x, mem x ys -> E x
+       ;
+      complete  ys := list_repr_impl E ys;
+    |}.
+  Next Obligation.
+    split.
+    - constructor.
+    - intros. inversion H.
+  Qed.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+    split.
+    inversion H. auto.
+    intros. inversion H. apply H2 in H0. auto.
+  Qed.
+
+  Program Definition create_nauto {A} (E: A -> Prop) : nauto A :=
+    {|
+      state   := list A;
+      initial := (fun s => s = nil) ;
+      step    :=
+        (fun s1 n s2 =>
+           (~ mem n s1) /\ s2 = n::s1 /\ E n
+        );
+      final   := (fun s2 => list_repr_impl E s2);
+    |}.
+  
+  
+End EnumerateSet.
+
+
 
 (* Combinator for enumerating the elements of list [xs], in order,
    expressed as an automaton. *)
