@@ -179,16 +179,25 @@ Proof.
   intros x. change [x] with (snoc [] x). eauto with prefix.
 Qed.
 
-Lemma prefix_nil {A} :
+Lemma nil_prefix {A} :
   forall xs : list A,
-  nil ⊆ xs.
+  [] ⊆ xs.
 Proof.
   intros xs. destruct xs as [| x xs']; eauto with prefix.
   change (x :: xs') with ([x] ++ xs').
   eauto using prefix_app, prefix_transitive.
 Qed.
 
-Local Hint Resolve prefix_app prefix_transitive prefix_nil : prefix.
+Lemma prefix_nil {A} :
+  forall xs : list A,
+  xs ⊆ [] ->
+  xs = [].
+Proof.
+  induction xs.
+  { eauto. }
+  { intros. inversion H; subst.
+
+Local Hint Resolve prefix_app prefix_transitive nil_prefix : prefix.
 
 (* -------------------------------------------------------------------------- *)
 
@@ -868,6 +877,10 @@ End SpaceNotations.
 
 Module EnumerateList.
 
+  (* TODO change [create] to something more useful *)
+  (* list_space ? *)
+  (* maybe avoid [_space] everywhere *)
+  (* maybe two modules: one for iteration spaces and other for automata *)
   Program Definition create {A} (xs: list A): space A :=
     {|
       permitted ys := ys ⊆ xs ;
@@ -883,7 +896,34 @@ Module EnumerateList.
     subst xs0. constructor.
   Qed.
 
+  Program Definition create_nauto {A} (xs: list A) : nauto A :=
+    {|
+      state   := list A ;
+      initial := (fun ys => ys = []) ;
+      step    := (fun ys1 n ys2 => ys2 = snoc ys1 n /\ ys2 ⊆ xs ) ;
+      final   := (fun ys => ys = xs);
+    |}.
+
+  Lemma roundt {A} (xs: list A) :
+    a2s (s2a (create xs)) ≡ (create xs).
+  Proof. apply roundtrip1. Qed.
+
+  Lemma list_equiv :
+    forall A (xs: list A), (create xs) ⊑ a2s (create_nauto xs).
+  Proof.
+  Admitted.
+
+  Program Definition create_empty {A} : space A :=
+    {|
+      permitted ys := ys = [] ;
+      complete  ys := True ;
+    |}.
+  Next Obligation.
+
 End EnumerateList.
+
+(* Combinator for enumerating the elements of list [xs], in order,
+   expressed as an automaton. *)
 
 (* Combinator for enumerating integers from [i] up to [j], expressed as an
    interation space. *)
