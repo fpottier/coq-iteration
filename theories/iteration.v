@@ -188,16 +188,44 @@ Proof.
   eauto using prefix_app, prefix_transitive.
 Qed.
 
+Lemma prefix_len {A} :
+  forall l xs : list A,
+    xs ⊆ l -> length xs <= length l.
+  intros.
+  induction H as [|xs' x l H Ih].
+  - auto.
+  - unfold snoc in Ih. rewrite app_length in Ih.
+    simpl in Ih. lia.
+Qed.
+(* TODO : change two lemma names with invert *)
 Lemma prefix_nil {A} :
   forall xs : list A,
   xs ⊆ [] ->
   xs = [].
-Proof. intros.                
+Proof.
+  intros xs H.
+  apply prefix_len in H.
+  simpl in H.
+  apply Arith_prebase.le_n_0_eq_stt in H.
+  symmetry in H.
+  apply length_zero_iff_nil in H.
+  auto.
+Qed.
+
+Lemma prefix_single {A} :
+  forall xs (x : A),
+    xs ⊆ [x] ->
+    xs = [] \/ xs = [x].
+Proof.
+  intros xs x H.
+  destruct xs as [|x' xs].
+  left. auto.
   destruct xs.
-  { eauto. }
-  { intros. 
-    
-Admitted.
+  right. inversion H; subst. auto.
+  apply prefix_len in H0.
+  simpl in H0. lia.
+  apply prefix_len in H. simpl in *. lia.
+Qed.
 Local Hint Resolve prefix_app prefix_transitive nil_prefix prefix_nil : prefix.
 
 (* -------------------------------------------------------------------------- *)
@@ -871,46 +899,6 @@ End SpaceNotations.
 
 (* -------------------------------------------------------------------------- *)
 
-(* Combinator for enumerating the elements of list [xs], in order. *)
-
-(* TODO give a better name to this combinator *)
-(* FIXME? should this combinator be a record? *)
-
-Module EnumerateList.
-
-  (* TODO change [create] to something more useful *)
-  (* list_space ? *)
-  (* maybe avoid [_space] everywhere *)
-  (* maybe two modules: one for iteration spaces and other for automata *)
-  Program Definition create {A} (xs: list A): space A :=
-    {|
-      permitted ys := ys ⊆ xs ;
-      complete  ys := ys = xs ;
-    |}.
-  Next Obligation.
-    eauto with prefix.
-  Qed.
-  Next Obligation.
-    eauto with prefix.
-  Qed.
-  Next Obligation.
-    subst xs0. constructor.
-  Qed.
-
-  Program Definition create_nauto {A} (xs: list A) : nauto A :=
-    {|
-      state   := list A ;
-      initial := (fun ys => ys = []) ;
-      step    := (fun ys1 n ys2 => ys2 = snoc ys1 n /\ ys2 ⊆ xs ) ;
-      final   := (fun ys => ys = xs);
-    |}.
-
-  Lemma list_equiv :
-    forall A (xs: list A), (create xs) ⊑ a2s (create_nauto xs).
-  Proof.
-  Admitted.
-End EnumerateList.
-
 Module EnumerateEmpty.
   
   Program Definition create_space : space unit :=
@@ -934,37 +922,27 @@ Module EnumerateEmpty.
     exists tt. auto.
   Qed.
 
+  Lemma leads_to_empty :
+    forall xs x,
+      leadsto create_nauto xs x -> xs = [].
+    Proof.
+      intros.
+      inversion H as [s [H1 H2]].
+      inversion H2. auto. inversion H0.
+    Qed.
+    
   Lemma equiv :
     create_space ≡ a2s create_nauto.
   Proof.
-    split; split.
-    - intros. inversion H. subst. simpl.
-      exists tt. unfold leadsto.
-      exists tt. split.
-      + simpl. auto.
-      + unfold steps. constructor.
-    - intros. inversion H. subst.
-      simpl. exists tt. split; auto. unfold leadsto. exists tt.
-      split; simpl. auto. eauto with steps.
-    - intros.
-      simpl.
-      destruct xs.
-      + auto.
-      + inversion H.
-        inversion H0.
-        destruct H1. inversion H2. inversion H6.
-    - intros. simpl. inversion H.
-      destruct H0. inversion H0.
-      destruct H2. inversion H3. auto. inversion H4.      
+    split.
+    - split; simpl; intros; exists tt; try split; auto;
+    unfold leadsto; exists tt; simpl; split; auto;
+    subst; eauto with steps.
+    - split; simpl; intros.
+      + destruct H as [s H]. apply leads_to_empty with s. auto.
+      + destruct H as [s [H1 H2]]. apply leads_to_empty with s. auto. 
   Qed.
 
-  Lemma equiv2 : 
-    s2a create_space ≼ create_nauto.
-  Proof.
-    simpl.
-    split with (fun _ _ => True).
-  Admitted.
-    
 End EnumerateEmpty.
 
 Module EnumerateSingle.  
@@ -986,49 +964,126 @@ Module EnumerateSingle.
   
   Program Definition create_nauto {A} (x : A) : nauto A :=
     {|
-      state   := Prop;
-      initial := (fun s => s) ;
-      step    := (fun s1 n s2 => n = x /\ s1 /\ ~s2);
-      final   := (fun s2 => ~s2);
+      state   := bool;
+      initial := (fun s => s = true) ;
+      step    := (fun s1 n s2 => n = x /\ s1=true /\ s2=false);
+      final   := (fun s => s =false);
     |}.
-  Next Obligation.
-    exists True. auto.
+
+  (* TODO check equiv with list-space *)
+
+  Lemma nauto_true_empty :
+    forall A (x:A) xs, leadsto (create_nauto x) xs true -> xs = [].
+  Proof.
+    intros A x xs H.
+    inversion H as [s [H1 H2]].
+    simpl in H1. subst. inversion H2.
+    auto. subst. destruct H0 as [H3 [H4 H5]].
+    subst. inversion H1. subst. inversion H0 as [_ [H7 _]]. discriminate.
   Qed.
 
   Lemma equiv :
     forall A (x:A), create_space x ≡ a2s (create_nauto x).
   Proof.
-    Admitted.
+    intros. split; split; simpl; intros. 
+    - apply prefix_single in H. destruct H.
+      exists true. subst. apply leadsto_initial. simpl. auto.
+      subst. exists false. replace ([x]) with (snoc [] x).
+      apply leadsto_snoc with true. apply leadsto_initial. simpl. auto.
+      simpl. split; auto. unfold snoc. auto.
+    - exists false. split; auto.
+      subst. replace ([x]) with (snoc [] x).
+      apply leadsto_snoc with true.
+      apply leadsto_initial. simpl. auto.
+      simpl. split; auto. unfold snoc. auto.
+    - destruct H as [s2 [s1 [H1 H2]]].
+      inversion H2; subst. eauto with prefix.
+      inversion H. subst. inversion H0. subst.
+      eauto with prefix. inversion H3. subst. inversion H.
+      destruct H10. destruct H7. subst. discriminate.
+    - intros. simpl. inversion H as [s [H1 H2]].
+      inversion H1 as [s2 [H3 H4]].
+      simpl in *. inversion H4; subst. discriminate.
+      simpl in *. subst.
+      inversion H5. subst. destruct H0 as [H6]. rewrite H6. auto.
+      subst. destruct H0 as [_ [_ H0]].
+      destruct H2 as [_ [H2 _]]. subst. discriminate.
+  Qed.
 End EnumerateSingle.
 
-Require Import Field.
+(* Combinator for enumerating the elements of list [xs], in order. *)
+
+(* TODO give a better name to this combinator *)
+(* FIXME? should this combinator be a record? *)
+
+Module EnumerateList.
+
+  (* TODO change [create] to something more useful *)
+  (* list_space ? *)
+  (* maybe avoid [_space] everywhere *)
+  (* maybe two modules: one for iteration spaces and other for automata *)
+  Program Definition create_space {A} (xs: list A): space A :=
+    {|
+      permitted ys := ys ⊆ xs ;
+      complete  ys := ys = xs ;
+    |}.
+  Next Obligation.
+    eauto with prefix.
+  Qed.
+  Next Obligation.
+    eauto with prefix.
+  Qed.
+  Next Obligation.
+    subst xs0. constructor.
+  Qed.
+
+  Program Definition create_nauto {A} (xs: list A) : nauto A :=
+    {|
+      state   := list A;
+      initial := (fun ys => ys = []) ;
+      step    := (fun ys1 n ys2 =>
+                    ys2 = snoc ys1 n /\ ys2 ⊆ xs ) ;
+      final   := (fun ys => ys = xs);
+    |}.
+      
+  Lemma list_equiv {A} :
+    forall (xs: list A),
+      (create_space xs) ⊑ a2s (create_nauto xs).
+  Proof.
+  Admitted.
+End EnumerateList.
 
 Module EnumerateRangeIncr.
 
-  Inductive incr : nat -> nat -> list nat -> Prop :=
+  Inductive incr : nat -> list nat -> Prop :=
   |Incr_base : forall x,
-      incr x x []
-  |Incr_prev : forall x1 x2 l,
-      incr x1 x2 l -> incr (S x1) x2 (x1::l).
+      incr x []
+  |Incr_prev : forall x l,
+      incr x l -> incr x (snoc l (x +length l)).
+
+  Lemma incr_prefix :
+    forall l xs x,
+      incr x l -> xs ⊆ l -> incr x xs.
+    intros l xs x H1 H2.
+    induction H2 as [|x' n l H3 H4]. auto.
     
-  Program Definition create_space (n : nat) (j : nat) {H: n <= j} : space nat :=
+    
+  Program Definition create_space (i : nat) (j : nat) : space nat :=
     {|
       permitted ys :=
-        length ys <= j /\ incr (j - length ys) j ys;
-      complete  ys := incr n j ys;
-    |}.
+        i <= j -> length ys <= j /\ incr i ys;
+      complete  ys :=
+        i <= j -> length ys = j
+      |}.
   Next Obligation.
-    rewrite PeanoNat.Nat.sub_0_r.
-    split. apply PeanoNat.Nat.le_0_l. constructor.
+    split. lia. constructor.
   Qed.
   Next Obligation.
-  Admitted.
-  Next Obligation.
-    induction xs.
-    - simpl.    rewrite PeanoNat.Nat.sub_0_r. split. apply PeanoNat.Nat.le_0_l. constructor.
-    - simpl. Admitted.
-
-  Program Definition create_nauto (n1 : nat) (n2 : nat) {H: n1 <= n2} : nauto nat :=
+    apply H in H1. destruct H1 as [H2 H3]. split.
+    - apply prefix_len in H0. lia.
+    - 
+    
+  Program Definition create_nauto (n1 : nat) (n2 : nat) : nauto nat :=
     {|
       state   := nat;
       initial := (fun s => s = n1) ;
@@ -1042,20 +1097,23 @@ End EnumerateRangeIncr.
 Module EnumerateInfiniteStream
 .
 
-  Fixpoint valid_seq
-    {A} (l:list A) (n : nat) (f : nat -> A) : Prop :=
-    match l with
-    |[] => True
-    |x::t => x = f n /\ valid_seq t (n+1) f
-    end.
+  Inductive valid_seq {A} :
+    list A -> (nat -> A) -> Prop :=
+  |Valid_nil : forall f, valid_seq nil f
+  |Valid_cons : forall l f,
+      valid_seq l f ->
+      valid_seq (snoc l (f (length l))) f.
   
   Program Definition create_space {A} (f: nat -> A) : space A := 
     {|
-      permitted ys := valid_seq ys 0 f;
+      permitted ys := valid_seq ys f;
       complete  ys := False;
     |}.
   Next Obligation.
-  Admitted.
+    constructor.
+  Qed.
+  Next Obligation.
+    Admitted.
   Next Obligation.
     inversion H.
   Qed.
@@ -1067,22 +1125,31 @@ Module EnumerateInfiniteStream
       initial := (fun s => s = 0) ;
       step    :=
         (fun s1 n s2 => s2 = s1 + 1 /\ n = f s1);
-      final   := (fun s2 => False);
+      final   := (fun _ => False);
     |}.
   
 End EnumerateInfiniteStream.
 
-Module EnumerateSet.
-  Require Import TLC.LibSet.
-  Require Import TLC.LibList.
+Require TLC.LibSet.
+Require TLC.LibList.
+Require TLC.LibLogic.
+Require TLC.LibMultiset.
 
+Module EnumerateSet.
+   Import TLC.LibSet.
+   Import TLC.LibList.
+
+
+  (* TODO change fun to set, maybe use functors *)
   Program Definition
     create_space {A} (E: A -> Prop) : space A := 
     {|
       permitted ys :=
+        (* TODO : convert ys to set, check if subset *)
         noduplicates ys /\ forall x, mem x ys -> E x
-       ;
-      complete  ys := list_repr_impl E ys;
+    ;
+      (* TODO : change to something else maybe? *)
+      complete ys := list_repr_impl E ys;
     |}.
   Next Obligation.
     split.
@@ -1102,14 +1169,75 @@ Module EnumerateSet.
       state   := list A;
       initial := (fun s => s = nil) ;
       step    :=
-        (fun s1 n s2 =>
-           (~ mem n s1) /\ s2 = n::s1 /\ E n
+        (fun s1 x s2 =>
+           (~ mem x s1) /\ s2 = x::s1 /\ E x
         );
       final   := (fun s2 => list_repr_impl E s2);
     |}.
-  
-  
+    
 End EnumerateSet.
+
+
+Module EnumerateMultiset.
+   Import TLC.LibMultiset.
+   Import TLC.LibList.
+   Import TLC.LibLogic.
+
+   Fixpoint incr {A} (l : list (A*nat)) (x : A) :=
+     match l with
+     |nil => (x, 1)::nil
+     |(y, n)::t =>
+        If y = x then
+          (y, n+1)::t
+        else
+          (y, n)::(incr t x)
+     end.
+       
+   Fixpoint zip {A} (l : list A) :=
+     match l with
+     |nil => nil
+     |x::t =>
+        incr (zip t) x end.
+   
+  Program Definition
+    create_space {A} (E: A -> nat) : space A := 
+    {|
+      (* convert list to multiset *)
+      permitted ys :=
+        noduplicates (LibList.map (@fst _ _) (zip ys))
+        /\ forall n x, mem (x,n) (zip ys) -> (n = E x /\ n > 0);
+      
+      complete  ys := list_repr_impl E (zip ys);
+    |}.
+  Next Obligation.
+    split.
+    - rewrite map_nil. constructor.
+    - intros. inversion H.      
+  Qed.
+  Next Obligation.
+  Admitted.
+  Next Obligation.
+    split.
+    - inversion H. auto.
+    - intros. inversion H.
+      destruct H2 with n x.
+      auto.
+  Qed.
+
+  Program Definition create_nauto {A} (E: A -> nat) : nauto A :=
+    {|
+      state   := list (A*nat);
+      initial := (fun s => s = nil) ;
+      step    :=
+        (fun s1 x s2 =>
+           (~ mem (x, E x) s1
+            /\ s2 = incr s1 x /\ E x > 0))
+        ;
+      final := (fun s2 => list_repr_impl E s2);
+    |}.
+    
+End EnumerateMultiset.
+
 
 
 
